@@ -1,10 +1,8 @@
 #include <M5Stack.h>
 #define TINY_GSM_MODEM_UBLOX
 #include <TinyGsmClient.h>
-//#include <TinyGPS++.h>
 #include "Adafruit_SI1145.h"
 #include <PubSubClient.h>
-#include "Adafruit_SI1145.h" // センサのライブラリ
 
 
 // 3G 設定
@@ -31,14 +29,14 @@ unsigned long lastConnectionTime = 0;
 const unsigned long postingInterval = 30L * 1000L; // Publish の間隔を30秒にする
 
 
-// センサ 設定
-Adafruit_SI1145 uv = Adafruit_SI1145();
-String sensorValStr;
+// 光センサ 設定
+uint16_t lightVal = 0;
+String lightValStr;
 
 
 // 関数宣言
 void init3G();
-void sensing();
+void lightSensing();
 void reConnect();
 void mqttPublish();
 
@@ -50,19 +48,23 @@ void setup() {
 
   init3G();
   mqttClient.setServer(server, 1883); // MQTT ブローカの詳細設定
+
+  pinMode(26, INPUT); // 光センサの pin 宣言  
   
   M5.Lcd.clear(BLACK);
 }
 
 
 void loop() {
-  reConnect();  // 接続が切れた際に再接続
+  if (!mqttClient.connected()) { // 接続が切れた際に再接続
+    reConnect();
+  }
 
   mqttClient.loop();   // MQTT 接続を確立する
 
   // 最後に Publish した時間から postingInterval が経過すると動作する
   if (millis() - lastConnectionTime > postingInterval) {
-    sensing();
+    lightSensing();
     mqttPublish();
   }
 }
@@ -105,24 +107,16 @@ void init3G() { // 3G 接続の初期設定
 }
 
 
-void sensing() { // センサの値を計測する関数
-  if (! uv.begin()) {
-    M5.Lcd.clear(BLACK);
-    M5.Lcd.setTextColor(WHITE, BLACK);
-    M5.Lcd.setCursor(0, 20);
-    M5.Lcd.println("SI1145 not found. Please restart.");
-    while(1);
-  }
-  
-  float visVal = uv.readVisible();
-  sensorValStr = (String)visVal;
+void lightSensing() { // 光センサの値を計測する関数
+  lightVal = analogRead(36);
+  lightValStr = (String)lightVal;
 
   M5.Lcd.setTextSize(3);
   M5.Lcd.setTextColor(RED, BLACK);
   M5.Lcd.setCursor(0, 60);
-  M5.Lcd.print("visVal:");
+  M5.Lcd.print("Light:");
   M5.Lcd.setCursor(160, 60);
-  M5.Lcd.print(visVal);
+  M5.Lcd.print(lightVal);
 }
 
 
@@ -160,7 +154,7 @@ void reConnect() { // 再接続用の関数
 
 void mqttPublish() {
   // ThingSpeak に Publish するための文字列データを作成する
-  String data = ("field1=" + sensorValStr);
+  String data = ("field1=" + lightValStr);
 
   int length = data.length();
   char msgBuffer[length];
