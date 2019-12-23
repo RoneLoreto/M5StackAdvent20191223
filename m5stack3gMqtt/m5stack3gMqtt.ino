@@ -1,7 +1,6 @@
 #include <M5Stack.h>
 #define TINY_GSM_MODEM_UBLOX
 #include <TinyGsmClient.h>
-#include "Adafruit_SI1145.h"
 #include <PubSubClient.h>
 
 
